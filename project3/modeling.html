@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
-<title>Jacob Tucker - CS 435 - Project 2</title>
+<title>Jacob Tucker - CS 435 - Project 3</title>
 
 <script id="vertex-shader" type="x-shader/x-vertex">
 attribute vec4 vPosition;
@@ -37,7 +37,15 @@ main()
 </head>
 
 <body>
-<canvas id="gl-canvas" width="1024" height="1024">
+<select id="price-mode">
+    <option value="regular">Regular</option>
+    <option value="mid">Mid</option>
+    <option value="premium">Premium</option>
+</select>
+<button id="up-button" onclick="incrementPrice()">Up</button>
+<button id="down-button" onclick="decrementPrice()">Down</button>
+<button id="toggle-rotate" onclick="toggleRotate()">Start</button>
+<canvas id="gl-canvas" width="800" height="800">
 Oops ... your browser doesn't support the HTML5 canvas element
 </canvas>
 </body>
