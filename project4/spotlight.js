@@ -20,7 +20,7 @@ var vPosition;
 var vNormal;
 var objList = new Array();
 
-var lightPosition = vec4(0.0, 25.0, 0.0, 1.0);
+var lightPosition = vec4(0.0, 3.0, 0.0, 1.0);
 var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0);
 var lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
 var lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
@@ -91,7 +91,6 @@ class Circle extends Obj {
         for (var point of this.points) {
             this.norms.push(normal);
         }
-        console.log(this.norms);
     }
 
 }
@@ -119,12 +118,11 @@ class Quad extends Obj {
         for (var point of this.points) {
             this.norms.push(normal);
         }
-        console.log(this.norms);
     }
 }
 
 window.onload = function init() {
-    lightDirection = vec4(0, -1, 0, 0);
+    lightDirection = vec3(0, -1, 0);
     canvas = document.getElementById("gl-canvas");
 
 
@@ -150,6 +148,7 @@ window.onload = function init() {
     createRoom();
 
     var edgeMidpoint = mix(objList[0].points[1], objList[0].points[2], 0.5);
+    console.log(edgeMidpoint);
     modelViewMatrix = lookAt(add(edgeMidpoint, vec3(0,4,0)), vec3(0,0,0), vec3(0,1,0));
     gl.uniformMatrix4fv(modelViewMatrixLoc, gl.TRUE, flatten(modelViewMatrix));
 
@@ -157,9 +156,7 @@ window.onload = function init() {
     diffuseProduct = mult(lightDiffuse, materialDiffuse);
     specularProduct = mult(lightSpecular, materialSpecular);
 
-    console.log(ambientProduct);
-    console.log(diffuseProduct);
-    console.log(specularProduct);
+    var limit = Math.cos(Math.PI);
 
     gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"),
        flatten(ambientProduct));
@@ -167,10 +164,12 @@ window.onload = function init() {
        flatten(diffuseProduct) );
     gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"), 
        flatten(specularProduct) );	
-    console.log(specularProduct);
     gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), 
        flatten(lightPosition) );
+    gl.uniform3fv(gl.getUniformLocation(program, "lightDirection"), 
+       flatten(lightDirection) );
     gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
+    gl.uniform1f(gl.getUniformLocation(program, "lightLimit"), limit);
     
     render();
 }
