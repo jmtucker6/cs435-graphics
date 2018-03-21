@@ -51,17 +51,23 @@ main()
 
     vec4 diffuse = vec4(0.0, 0.0, 0.0, 1.0);
     vec4 specular = vec4(0.0, 0.0, 0.0, 1.0);
-    if (true) {
+    if (dotFromDirection >= lightLimit) {
         float Kd = max(dot(L,N), 0.0);
-        diffuse = Kd*diffuseProduct;
+        diffuse = Kd * pow(dotFromDirection, 4.0) * diffuseProduct;
 
         float Ks = pow(max(dot(N,H), 0.0), shininess);
-        specular = Ks * pow(dotFromDirection, 2.0) * specularProduct;
-        // specular = Ks * specularProduct;
+        specular = Ks * pow(dotFromDirection, 4.0) * specularProduct;
     }
 
     
-    if(dot(L,N) < 0.0) specular = vec4(0.0, 0.0, 0.0, 1.0);
+    if(dot(L,N) < 0.0) {
+        specular = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+
+    if (!gl_FrontFacing) {
+        specular = vec4(0.0, 0.0, 0.0, 1.0);
+        diffuse = vec4(0.0, 0.0, 0.0, 1.0);
+    }
 
     fColor = ambient + diffuse + specular;
     fColor.a = 1.0;
@@ -81,4 +87,9 @@ main()
     Oops ... your browser doesn't support the HTML5 canvas element
     </canvas>
 </body>
+<select id="spotlightAngle" onclick="setAngle()">
+    <option value="smallAngle">Small</option>
+    <option value="medAngle">Medium</option>
+    <option value="largeAngle">Large</option>
+</select>
 </html>
