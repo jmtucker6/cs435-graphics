@@ -53,10 +53,10 @@ main()
     vec4 specular = vec4(0.0, 0.0, 0.0, 1.0);
     if (dotFromDirection >= lightLimit) {
         float Kd = max(dot(L,N), 0.0);
-        diffuse = Kd * pow(dotFromDirection, 4.0) * diffuseProduct;
+        diffuse = Kd * pow(dotFromDirection, 6.0) * diffuseProduct;
 
         float Ks = pow(max(dot(N,H), 0.0), shininess);
-        specular = Ks * pow(dotFromDirection, 4.0) * specularProduct;
+        specular = Ks * pow(dotFromDirection, 6.0) * specularProduct;
     }
 
     

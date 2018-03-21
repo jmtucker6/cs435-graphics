@@ -28,8 +28,8 @@ var lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 var lightDirection;
 
 var materialAmbient = vec4(1.0, 1.0, 1.0, 1.0);
-var materialDiffuse = vec4(0.0, 0.0, 1.0, 1.0);
-var materialSpecular = vec4(0.0, 0.0, 1.0, 1.0);
+var materialDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
+var materialSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 var materialShininess = 500.0;
 
 var ambientProduct, diffuseProduct, specularProduct;
@@ -39,6 +39,9 @@ let medAngle = Math.atan(2/4.0);
 let smallAngle = Math.atan(1/4.0);
 var angle;
 var limit;
+var targetArr = [];
+var targetIndex;
+var targetHeight;
 
 var currentWall;
 
@@ -127,7 +130,6 @@ class Quad extends Obj {
         for (var point of this.points) {
             this.norms.push(normal);
         }
-        console.log(dot(subtract(this.points[0], vec3(0,0,0)), this.norms[0]));
     }
 }
 
@@ -156,8 +158,9 @@ window.onload = function init() {
 
     createRoom();
 
-    lightDirection = normalize(subtract(objList[0].points[6].slice(0,3), lightPosition.slice(0,3)));
-    console.log('lightDirection', lightDirection);
+    targetIndex = 10;
+    targetHeight = 0;
+    lightDirection = normalize(subtract(targetArr[targetIndex].slice(0,3), lightPosition.slice(0,3)));
 
     currentWall = 1;
     var edgeMidpoint = mix(objList[0].points[currentWall], objList[0].points[currentWall%8 + 1], 0.5);
@@ -192,9 +195,24 @@ window.onload = function init() {
             var edgeMidpoint = mix(objList[0].points[currentWall], objList[0].points[currentWall%8 + 1], 0.5);
             modelViewMatrix = lookAt(add(edgeMidpoint, vec3(0,4,0)), vec3(0,0,0), vec3(0,1,0));
             gl.uniformMatrix4fv(modelViewMatrixLoc, gl.TRUE, flatten(modelViewMatrix));
+        } else if (targetArr.length > 0){
+            if (event.key == 'ArrowLeft') {
+                targetIndex = (targetIndex+1)%targetArr.length;
+            } else if (event.key == 'ArrowRight') {
+                targetIndex -= 1;
+                if (targetIndex < 0) targetIndex += targetArr.length;
+            } else if (event.key == 'ArrowUp') {
+                targetHeight = Math.min(2, targetHeight+1);
+            } else if (event.key == 'ArrowDown') {
+                targetHeight = Math.max(0, targetHeight-1);
+            }
+            var targetPoint = add(targetArr[targetIndex].slice(0,3), vec3(0, targetHeight*1.5, 0));
+            lightDirection = normalize(subtract(targetPoint, lightPosition.slice(0,3)));
+            gl.uniform3fv(gl.getUniformLocation(program, "lightDirection"), 
+               flatten(lightDirection) );
+        }
 
             render();
-        }
     })
 }
 
@@ -214,10 +232,13 @@ function createRoom() {
     for (var i = 0; i<8; i++) {
         createWall(floor, i);
     } 
+    console.log(targetArr);
 }
 
 function createWall(floor, i) {
     var diffVec = subtract(floor.points[(i+1)%8+1], floor.points[i+1]);
+    targetArr[2*i] = floor.points[i+1];
+    targetArr[2*i + 1] = add(floor.points[i+1], scale(1/2.0, diffVec));
     for (var row = 0; row < 2; row++) {
         for (var column = 0; column < 2; column++) {
             var p1 = add(add(floor.points[i+1], scale(column/2.0, diffVec)), vec3(0, 1.5*row, 0));
