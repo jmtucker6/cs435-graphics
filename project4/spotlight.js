@@ -11,6 +11,7 @@
 
 var gl;
 var canvas;
+var program;
 var globalProgram;
 var fColor;
 var projection;
@@ -20,18 +21,29 @@ var vPosition;
 var vNormal;
 var objList = new Array();
 
-var lightPosition = vec4(0.0, 25.0, 0.0, 1.0);
+var lightPosition = vec4(0.0, 4.0, 0.0, 1.0);
 var lightAmbient = vec4(0.2, 0.2, 0.2, 1.0);
 var lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
 var lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 var lightDirection;
 
-var materialAmbient = vec4(1.0, 0.0, 1.0, 1.0);
-var materialDiffuse = vec4(1.0, 0.0, 0.0, 1.0);
-var materialSpecular = vec4(1.0, 0.0, 0.0, 1.0);
+var materialAmbient = vec4(1.0, 1.0, 1.0, 1.0);
+var materialDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
+var materialSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 var materialShininess = 500.0;
 
 var ambientProduct, diffuseProduct, specularProduct;
+
+let largeAngle = Math.atan(3/4.0);
+let medAngle = Math.atan(2/4.0);
+let smallAngle = Math.atan(1/4.0);
+var angle;
+var limit;
+var targetArr = [];
+var targetIndex;
+var targetHeight;
+
+var currentWall;
 
 class Obj {
     constructor() {
@@ -91,7 +103,6 @@ class Circle extends Obj {
         for (var point of this.points) {
             this.norms.push(normal);
         }
-        console.log(this.norms);
     }
 
 }
@@ -115,16 +126,14 @@ class Quad extends Obj {
         this.norms = [];
         var u = subtract(this.points[1], this.points[0]);
         var v = subtract(this.points[2], this.points[0]);
-        var normal = normalize(cross(u,v));
+        var normal = normalize(scale(1,cross(u,v)));
         for (var point of this.points) {
             this.norms.push(normal);
         }
-        console.log(this.norms);
     }
 }
 
 window.onload = function init() {
-    lightDirection = vec4(0, -1, 0, 0);
     canvas = document.getElementById("gl-canvas");
 
 
@@ -135,7 +144,7 @@ window.onload = function init() {
     gl.viewport(0,0,canvas.width, canvas.height);
     gl.clearColor(1.0, 1.0, 1.0, 1.0);
 
-    var program = initShaders(gl, "vertex-shader", "fragment-shader");
+    program = initShaders(gl, "vertex-shader", "fragment-shader");
     gl.useProgram(program);
 
     vNormal = gl.getAttribLocation(program, 'normal');
@@ -149,7 +158,12 @@ window.onload = function init() {
 
     createRoom();
 
-    var edgeMidpoint = mix(objList[0].points[1], objList[0].points[2], 0.5);
+    targetIndex = 10;
+    targetHeight = 0;
+    lightDirection = normalize(subtract(targetArr[targetIndex].slice(0,3), lightPosition.slice(0,3)));
+
+    currentWall = 1;
+    var edgeMidpoint = mix(objList[0].points[currentWall], objList[0].points[currentWall%8 + 1], 0.5);
     modelViewMatrix = lookAt(add(edgeMidpoint, vec3(0,4,0)), vec3(0,0,0), vec3(0,1,0));
     gl.uniformMatrix4fv(modelViewMatrixLoc, gl.TRUE, flatten(modelViewMatrix));
 
@@ -157,9 +171,7 @@ window.onload = function init() {
     diffuseProduct = mult(lightDiffuse, materialDiffuse);
     specularProduct = mult(lightSpecular, materialSpecular);
 
-    console.log(ambientProduct);
-    console.log(diffuseProduct);
-    console.log(specularProduct);
+    setAngle();
 
     gl.uniform4fv(gl.getUniformLocation(program, "ambientProduct"),
        flatten(ambientProduct));
@@ -167,12 +179,41 @@ window.onload = function init() {
        flatten(diffuseProduct) );
     gl.uniform4fv(gl.getUniformLocation(program, "specularProduct"), 
        flatten(specularProduct) );	
-    console.log(specularProduct);
     gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), 
        flatten(lightPosition) );
+    gl.uniform3fv(gl.getUniformLocation(program, "lightDirection"), 
+       flatten(lightDirection) );
     gl.uniform1f(gl.getUniformLocation(program, "shininess"), materialShininess);
+    gl.uniform1f(gl.getUniformLocation(program, "lightLimit"), limit);
     
     render();
+
+    document.addEventListener('keypress',(event) => {
+        if (event.key == 'Enter') {
+            currentWall = currentWall%8 + 1;
+
+            var edgeMidpoint = mix(objList[0].points[currentWall], objList[0].points[currentWall%8 + 1], 0.5);
+            modelViewMatrix = lookAt(add(edgeMidpoint, vec3(0,4,0)), vec3(0,0,0), vec3(0,1,0));
+            gl.uniformMatrix4fv(modelViewMatrixLoc, gl.TRUE, flatten(modelViewMatrix));
+        } else if (targetArr.length > 0){
+            if (event.key == 'ArrowLeft') {
+                targetIndex = (targetIndex+1)%targetArr.length;
+            } else if (event.key == 'ArrowRight') {
+                targetIndex -= 1;
+                if (targetIndex < 0) targetIndex += targetArr.length;
+            } else if (event.key == 'ArrowUp') {
+                targetHeight = Math.min(2, targetHeight+1);
+            } else if (event.key == 'ArrowDown') {
+                targetHeight = Math.max(0, targetHeight-1);
+            }
+            var targetPoint = add(targetArr[targetIndex].slice(0,3), vec3(0, targetHeight*1.5, 0));
+            lightDirection = normalize(subtract(targetPoint, lightPosition.slice(0,3)));
+            gl.uniform3fv(gl.getUniformLocation(program, "lightDirection"), 
+               flatten(lightDirection) );
+        }
+
+            render();
+    })
 }
 
 function render(){
@@ -189,13 +230,45 @@ function createRoom() {
     floor.init();
     objList.push(floor);
     for (var i = 0; i<8; i++) {
-        var p1 = floor.points[i+1];
-        var p2 = floor.points[(i+1)%8+1];
-        var p3 = add(p1, vec3(0,3,0));
-        var p4 = add(p2, vec3(0,3,0));
-        var wall = new Quad(p1, p2, p3, p4);
-        wall.init();
-        objList.push(wall);
+        createWall(floor, i);
     } 
+    console.log(targetArr);
+}
+
+function createWall(floor, i) {
+    var diffVec = subtract(floor.points[(i+1)%8+1], floor.points[i+1]);
+    targetArr[2*i] = floor.points[i+1];
+    targetArr[2*i + 1] = add(floor.points[i+1], scale(1/2.0, diffVec));
+    for (var row = 0; row < 2; row++) {
+        for (var column = 0; column < 2; column++) {
+            var p1 = add(add(floor.points[i+1], scale(column/2.0, diffVec)), vec3(0, 1.5*row, 0));
+            var p2 = add(add(floor.points[i+1], scale((column+1)/2.0, diffVec)), vec3(0, 1.5*row, 0));
+            var p3 = add(p1, vec3(0, 1.5, 0));
+            var p4 = add(p2, vec3(0, 1.5, 0));
+            var section = new Quad(p2,p1,p4,p3);
+            section.init();
+            objList.push(section);
+        }
+    }
+
+}
+
+function setAngle() {
+    switch(document.getElementById("spotlightAngle").value) {
+        case "smallAngle":
+            angle = smallAngle;
+            limit = Math.cos(angle);
+            break;
+        case "medAngle":
+            angle = medAngle;
+            limit = Math.cos(angle);
+            break;
+        case "largeAngle":
+            angle = largeAngle;
+            limit = Math.cos(angle);
+            break;
+    }
+    gl.uniform1f(gl.getUniformLocation(program, "lightLimit"), limit);
+    render();
 }
 

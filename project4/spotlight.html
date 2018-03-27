@@ -7,8 +7,9 @@
 <script id="vertex-shader" type="x-shader/x-vertex">
 attribute vec3 normal;
 attribute vec4 vPosition;
-varying vec3 N, L, E;
+varying vec3 N, L, LD, E;
 
+uniform vec3 lightDirection;
 uniform mat4 projection;
 uniform mat4 modelViewMatrix;
 uniform vec4 lightPosition;
@@ -17,11 +18,14 @@ void
 main()
 {
     vec3 pos = (modelViewMatrix * vPosition).xyz;
-    L = normalize(lightPosition.xyz - pos);
+    L = normalize((modelViewMatrix*lightPosition).xyz - pos);
 
     E = -normalize(pos);
     vec4 norm = vec4(normal, 0);
     N = normalize((modelViewMatrix*norm).xyz);
+
+    vec4 lightDirection4 = vec4(lightDirection, 0);
+    LD = normalize((modelViewMatrix*lightDirection4).xyz);
 
     gl_Position = projection * modelViewMatrix * vPosition;
 }
@@ -30,10 +34,10 @@ main()
 <script id="fragment-shader" type="x-shader/x-fragment">
 precision mediump float;
 
-uniform vec4 lightDirection;
+uniform float lightLimit;
 uniform vec4 ambientProduct, diffuseProduct, specularProduct;
 uniform float shininess;
-varying vec3 N, L, E;
+varying vec3 N, L, LD, E;
 
 void
 main()
@@ -43,13 +47,27 @@ main()
     vec3 H = normalize(L+E);
     vec4 ambient = ambientProduct;
 
-    float Kd = max(dot(L,N), 0.0);
-    vec4 diffuse = Kd*diffuseProduct;
+    float dotFromDirection = dot(L, -LD);
 
-    float Ks = pow(max(dot(N,H), 0.0), shininess);
-    vec4 specular = Ks * specularProduct;
+    vec4 diffuse = vec4(0.0, 0.0, 0.0, 1.0);
+    vec4 specular = vec4(0.0, 0.0, 0.0, 1.0);
+    if (dotFromDirection >= lightLimit) {
+        float Kd = max(dot(L,N), 0.0);
+        diffuse = Kd * pow(dotFromDirection, 6.0) * diffuseProduct;
+
+        float Ks = pow(max(dot(N,H), 0.0), shininess);
+        specular = Ks * pow(dotFromDirection, 6.0) * specularProduct;
+    }
+
     
-    if(dot(L,N) < 0.0) specular = vec4(0.0, 0.0, 0.0, 1.0);
+    if(dot(L,N) < 0.0) {
+        specular = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+
+    if (!gl_FrontFacing) {
+        specular = vec4(0.0, 0.0, 0.0, 1.0);
+        diffuse = vec4(0.0, 0.0, 0.0, 1.0);
+    }
 
     fColor = ambient + diffuse + specular;
     fColor.a = 1.0;
@@ -69,4 +87,9 @@ main()
     Oops ... your browser doesn't support the HTML5 canvas element
     </canvas>
 </body>
+<select id="spotlightAngle" onclick="setAngle()">
+    <option value="smallAngle">Small</option>
+    <option value="medAngle">Medium</option>
+    <option value="largeAngle">Large</option>
+</select>
 </html>
