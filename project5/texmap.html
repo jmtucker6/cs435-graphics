@@ -6,6 +6,9 @@
 
 <script id="vertex-shader" type="x-shader/x-vertex">
 attribute vec4 vPosition;
+attribute vec2 texCoord;
+
+varying vec2 fTexCoord;
 
 uniform mat4 projection;
 uniform mat4 transformation;
@@ -14,18 +17,20 @@ void
 main()
 {
     gl_Position = projection*transformation*vPosition;
+    fTexCoord = texCoord;
 }
 </script>
 
 <script id="fragment-shader" type="x-shader/x-fragment">
 precision mediump float;
 
-uniform vec4 fColor;
+uniform sampler2D texture;
+varying vec2 fTexCoord;
 
 void
 main()
 {
-    gl_FragColor = fColor;
+    gl_FragColor = texture2D(texture, fTexCoord);
 }
 </script>
 
@@ -39,7 +44,8 @@ main()
 <canvas id="gl-canvas" width="1024" height="1024">
 Oops ... your browser doesn't support the HTML5 canvas element
 </canvas>
-<img id="calculator-image" src="calculatorImage.jpeg" hidden />
-<img id="web-browser-image" src="webBrowserImage.jpeg" hidden />
+<img id="calculator-image" src="calculatorImage.jpg" width="512" height="512" hidden />
+<img id="web-browser-image" src="webBrowserImage.jpg" width="1024" height="512 "hidden />
+<img id="wallpaper-image" src="wallpaper.jpg" width="1024" height="1024" hidden />
 </body>
 </html>

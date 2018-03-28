@@ -13,18 +13,26 @@ var canvas;
 var applicationWindows;
 var selectedWindow;
 var transformation;
-var fColor;
 var projection;
 var vPosition;
 var oldX;
 var oldY;
 var calculatorTex;
 var webBrowserTex;
+var wallpaperTex;
+var wallpaper;
+
+var texCoord;
+var texCoords = [
+    vec2(0,0),
+    vec2(0,1),
+    vec2(1,1),
+    vec2(1,0)
+];
 
 class Window {
-    constructor(color, x0, y0, x1, y1, z) {
+    constructor(x0, y0, x1, y1, z) {
         this.NumVertices = 4;
-        this.color = color;
         this.topLeft = vec2(x0, y0);
         this.bottomRight = vec2(x1, y1);
         this.zIndex = z;
@@ -34,13 +42,19 @@ class Window {
         this.points.push(vec3(this.topLeft[0], this.bottomRight[1], this.zIndex));
         this.points.push(vec3(this.bottomRight, this.zIndex));
         this.points.push(vec3(this.bottomRight[0], this.topLeft[1], this.zIndex));
+
+        this.tPoints = [];
+        this.tPoints.push(vec2(texCoords[0]));
+        this.tPoints.push(vec2(texCoords[1]));
+        this.tPoints.push(vec2(texCoords[2]));
+        this.tPoints.push(vec2(texCoords[3]));
         
         this.offsetX = 0;
         this.offsetY = 0;
     }
 
     clone() {
-        var win = new Window(this.color, this.topLeft[0], this.topLeft[1], this.bottomRight[0], this.bottomRight[1], this.zIndex);
+        var win = new Window(this.topLeft[0], this.topLeft[1], this.bottomRight[0], this.bottomRight[1], this.zIndex);
         car.init();
         return car;
     }
@@ -74,33 +88,59 @@ class Window {
         this.vBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(this.points), gl.STATIC_DRAW);
+
+        this.tBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.tPoints), gl.STATIC_DRAW);
     }
 
     draw() {
         var tm = translate(this.offsetX, this.offsetY, this.zIndex);
         gl.uniformMatrix4fv(transformation, gl.TRUE, flatten(tm));
-        console.log(tm);
 
-        gl.uniform4fv(fColor, flatten(this.color));
-        console.log(this.color);
-        
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
         gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(vPosition);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
+        gl.vertexAttribPointer(texCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(texCoord);
+
         gl.drawArrays(gl.TRIANGLE_FAN, 0, this.points.length);
     }
 }
 
 class Calculator extends Window {
-    constructor(color, x0, y0, x1, y1, z) {
-        super(color, x0, y0, x1, y1, z);
+    constructor(x0, y0, x1, y1, z) {
+        super(x0, y0, x1, y1, z);
     }   
+    
+    draw() {
+        gl.bindTexture(gl.TEXTURE_2D, calculatorTex);
+        super.draw();
+    }
 }
 
 class WebBrowser extends Window {
-    constructor(color, x0, y0, x1, y1, z) {
-        super(color, x0, y0, x1, y1, z);
+    constructor(x0, y0, x1, y1, z) {
+        super(x0, y0, x1, y1, z);
     }   
+
+    draw() {
+        gl.bindTexture(gl.TEXTURE_2D, webBrowserTex);
+        super.draw();
+    }
+}
+
+class Wallpaper extends Window {
+    constructor(x0, y0, x1, y1, z) {
+        super(x0, y0, x1, y1, z);
+    }   
+
+    draw() {
+        gl.bindTexture(gl.TEXTURE_2D, wallpaperTex);
+        super.draw();
+    }
 }
 
 window.onload = function init() {
@@ -142,8 +182,12 @@ window.onload = function init() {
     var program = initShaders(gl, "vertex-shader", "fragment-shader");
     gl.useProgram(program);
 
+    wallpaper = new Wallpaper(0, 0, canvas.width, canvas.height, 0);
+    wallpaper.init();
+
     applicationWindows = [];
-    applicationWindows.push(new Calculator(vec4(1.0, 0.0, 0.0, 1.0), 100, 100, 600, 600, 1));
+    applicationWindows.push(new Calculator(100, 100, 600, 600, 1));
+    applicationWindows.push(new WebBrowser(200, 200, 700, 450, 2));
     for (var win of applicationWindows) {
         win.init();
     }
@@ -151,16 +195,20 @@ window.onload = function init() {
     selectedWindow = -1;
 
     vPosition = gl.getAttribLocation(program, "vPosition");
-    fColor = gl.getUniformLocation(program, "fColor");
+    texCoord = gl.getAttribLocation(program, "texCoord");
     transformation = gl.getUniformLocation(program, "transformation");
     projection = gl.getUniformLocation(program, "projection");
-    console.log(canvas.width);
-    console.log(canvas.height);
     var pm = ortho(0.0, canvas.width, canvas.height, 0.0, -10.0, 10.0);
     gl.uniformMatrix4fv(projection, gl.TRUE, flatten(pm));
 
-    var calcImg = document.getElementById('calculator-img');
-    var webBrowserImg = document.getElementById('web-browswer-img');
+    var calcImg = document.getElementById('calculator-image');
+    calculatorTex = configureTexture(calcImg);
+    var webBrowserImg = document.getElementById('web-browser-image');
+    webBrowserTex = configureTexture(webBrowserImg);
+    var wallpaperImg = document.getElementById('wallpaper-image');
+    wallpaperTex = configureTexture(wallpaperImg);
+
+    gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
 
 
     gl.enable(gl.DEPTH_TEST);
@@ -169,9 +217,9 @@ window.onload = function init() {
 
 function render(){
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    wallpaper.draw();
     for (var i = 0; i < applicationWindows.length; i++) {
         applicationWindows[i].draw();
-        console.log(applicationWindows[i]);
     }
 }
 
@@ -185,15 +233,12 @@ function convertMouseCoordinates(x, y) {
 function configureTexture( image ) {
     var texture = gl.createTexture();
     gl.bindTexture( gl.TEXTURE_2D, texture );
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, 
          gl.RGB, gl.UNSIGNED_BYTE, image );
     gl.generateMipmap( gl.TEXTURE_2D );
-    gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, 
-                      gl.NEAREST_MIPMAP_LINEAR );
-    gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
-    
-    // gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
-
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     return texture;
 }
