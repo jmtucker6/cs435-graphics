@@ -14,6 +14,7 @@ var applicationWindows;
 var selectedWindow;
 var transformation;
 var projection;
+var fColor;
 var vPosition;
 var oldX;
 var oldY;
@@ -21,6 +22,9 @@ var calculatorTex;
 var webBrowserTex;
 var wallpaperTex;
 var wallpaper;
+var taskBarTex;
+var taskBar;
+var closeTex;
 
 var texCoord;
 var texCoords = [
@@ -32,6 +36,7 @@ var texCoords = [
 
 class Window {
     constructor(x0, y0, x1, y1, z) {
+        this.color = vec4(1.0,1.0,1.0,1.0);
         this.NumVertices = 4;
         this.topLeft = vec2(x0, y0);
         this.bottomRight = vec2(x1, y1);
@@ -71,6 +76,11 @@ class Window {
 
     setZIndex(z) {
         this.zIndex = z;
+        for (var i = 0; i < this.points.length; i++) {
+            this.points[i][2] = z;
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.points), gl.STATIC_DRAW);
     }
 
     transform(x, y) {
@@ -79,10 +89,6 @@ class Window {
         return vec2(x2, y2);
     }
 
-    isInside(x, y) {
-        var p = this.transform(x, y);
-        return p[0] > this.topLeft[0] && p[0] < this.bottomRight[0] && p[1] > this.topLeft[1] && p[1] < this.bottomRight[1];
-    }
 
     init() {
         this.vBuffer = gl.createBuffer();
@@ -97,6 +103,7 @@ class Window {
     draw() {
         var tm = translate(this.offsetX, this.offsetY, this.zIndex);
         gl.uniformMatrix4fv(transformation, gl.TRUE, flatten(tm));
+        gl.uniform4fv(fColor, flatten(this.color));
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
         gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, false, 0, 0);
@@ -110,20 +117,101 @@ class Window {
     }
 }
 
-class Calculator extends Window {
+class ApplicationWindow extends Window {
     constructor(x0, y0, x1, y1, z) {
         super(x0, y0, x1, y1, z);
+        this.titlePoints = [];
+        this.titlePoints.push(vec3(x0, y0, z+.01));
+        this.titlePoints.push(vec3(x0, y0+20, z+.01));
+        this.titlePoints.push(vec3(x1-20, y0+20, z+.01));
+        this.titlePoints.push(vec3(x1-20, y0, z+.01));
+        this.closePoints = [];
+        this.closePoints.push(vec3(x1-20, y0, z+.01));
+        this.closePoints.push(vec3(x1-20, y0+20, z+.01));
+        this.closePoints.push(vec3(x1, y0+20, z+.01));
+        this.closePoints.push(vec3(x1, y0, z+.01));
+    }   
+
+    init() {
+        super.init();
+        this.cBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.cBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.closePoints), gl.STATIC_DRAW);
+    }
+
+    isInClose(x, y) {
+        var p = this.transform(x,y);
+        return p[0] >= this.closePoints[0][0] && p[0] <= this.closePoints[2][0] && p[1] <= this.closePoints[1][1] && p[1] >= this.closePoints[0][1];
+    }
+    
+    isInside(x, y) {
+        var p = this.transform(x, y);
+        return p[0] > this.titlePoints[0][0] && p[0] < this.titlePoints[2][0] && p[1] > this.titlePoints[0][1] && p[1] < this.titlePoints[1][1];
+    }
+
+    draw() {
+        super.draw();
+        this.drawTitle();
+        this.drawClose();
+    }
+
+    setZIndex(z) {
+        super.setZIndex(z);
+        for (var i = 0; i < this.titlePoints.length; i++) {
+            this.titlePoints[i][2] = z+.01;
+        }
+        for (var i = 0; i < this.closePoints.length; i++) {
+            this.closePoints[i][2] = z+.01;
+        }
+    }
+    
+    drawClose() {
+        gl.uniform4fv(fColor, flatten(this.color));
+        gl.bindTexture(gl.TEXTURE_2D, closeTex);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.cBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.closePoints), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(vPosition);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
+        gl.vertexAttribPointer(texCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(texCoord);
+
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, this.closePoints.length);
+    }
+
+    drawTitle() {
+        gl.uniform4fv(fColor, vec4(0.0, 0.0, 0.0, 1.0));
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.cBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.titlePoints), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(vPosition);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
+        gl.vertexAttribPointer(texCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(texCoord);
+        
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, this.titlePoints.length);
+    }
+}
+
+class Calculator extends ApplicationWindow {
+    constructor(x0, y0, x1, y1, z) {
+        super(x0, y0, x1, y1, z);
+        this.name = 'calc';
     }   
     
     draw() {
         gl.bindTexture(gl.TEXTURE_2D, calculatorTex);
         super.draw();
     }
+
 }
 
-class WebBrowser extends Window {
+class WebBrowser extends ApplicationWindow {
     constructor(x0, y0, x1, y1, z) {
         super(x0, y0, x1, y1, z);
+        this.name = 'browser';
     }   
 
     draw() {
@@ -149,15 +237,39 @@ window.onload = function init() {
     canvas.addEventListener('mousedown', function(event) {
         if (event.button != 0) return;
         var [x,y] = convertMouseCoordinates(event.pageX, event.pageY);
+        var currWindow;
         oldX = x;
         oldY = y;
 
         for (var i = 0; i < applicationWindows.length; i++) {
             if (applicationWindows[i].isInside(x, y)) {
                 selectedWindow = i;
+                currWindow = applicationWindows[i];
+                applicationWindows.splice(selectedWindow, 1);
+                applicationWindows.push(currWindow);
+                console.log(applicationWindows);
+                for (var j = 0; j < applicationWindows.length; j++) {
+                    applicationWindows[j].setZIndex(j+1);
+                }
+                selectedWindow = applicationWindows.length-1;
+                console.log(selectedWindow);
+                window.requestAnimFrame(render);
+                return;
             }
         }
     });
+
+    canvas.addEventListener('click', function(event) {
+        var [x,y] = convertMouseCoordinates(event.pageX, event.pageY);
+        for (var i = 0; i < applicationWindows.length; i++) {
+            if (applicationWindows[i].isInClose(x,y)) {
+                var currWindow = applicationWindows[i];
+                applicationWindows.splice(i,1);
+                window.requestAnimFrame(render);
+                return;
+            }
+        }
+    })
 
     canvas.addEventListener('mousemove', function(event) {
         if (selectedWindow === -1) return;
@@ -195,6 +307,7 @@ window.onload = function init() {
     selectedWindow = -1;
 
     vPosition = gl.getAttribLocation(program, "vPosition");
+    fColor = gl.getUniformLocation(program, "fColor");
     texCoord = gl.getAttribLocation(program, "texCoord");
     transformation = gl.getUniformLocation(program, "transformation");
     projection = gl.getUniformLocation(program, "projection");
@@ -207,6 +320,8 @@ window.onload = function init() {
     webBrowserTex = configureTexture(webBrowserImg);
     var wallpaperImg = document.getElementById('wallpaper-image');
     wallpaperTex = configureTexture(wallpaperImg);
+    var closeImg = document.getElementById('close-image');
+    closeTex = configureTexture(closeImg);
 
     gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
 
