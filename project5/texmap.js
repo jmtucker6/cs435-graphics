@@ -25,6 +25,8 @@ var wallpaper;
 var taskBarTex;
 var taskBar;
 var closeTex;
+var calcIconTex;
+var browserIconTex;
 
 var texCoord;
 var texCoords = [
@@ -231,6 +233,72 @@ class Wallpaper extends Window {
     }
 }
 
+class Taskbar  extends Window {
+    constructor(x0, y0, x1, y1, z) {
+        super(x0, y0, x1, y1, z);
+        this.calcIconPoints = [];
+        this.calcIconPoints.push(vec3(x0+20, y0, z+0.1));
+        this.calcIconPoints.push(vec3(x0+20, y1, z+0.1));
+        this.calcIconPoints.push(vec3(x0+60, y1, z+0.1));
+        this.calcIconPoints.push(vec3(x0+60, y0, z+0.1));
+
+        this.browserIconPoints = [];
+        this.browserIconPoints.push(vec3(x0+80, y0, z+0.1));
+        this.browserIconPoints.push(vec3(x0+80, y1, z+0.1));
+        this.browserIconPoints.push(vec3(x0+120, y1, z+0.1));
+        this.browserIconPoints.push(vec3(x0+120, y0, z+0.1));
+    }   
+
+    draw() {
+        gl.bindTexture(gl.TEXTURE_2D, wallpaperTex);
+        this.color = vec4(0,0,0,1);
+        gl.uniform4fv(fColor, flatten(this.color));
+        super.draw();
+        this.drawBrowserIcon();
+        this.drawCalcIcon();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.points), gl.STATIC_DRAW);
+    }
+
+    drawBrowserIcon() {
+        gl.bindTexture(gl.TEXTURE_2D, browserIconTex);
+        this.color = vec4(1,1,1,1);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.browserIconPoints), gl.STATIC_DRAW);
+        super.draw();
+    }
+
+    drawCalcIcon() {
+        gl.bindTexture(gl.TEXTURE_2D, calcIconTex);
+        this.color = vec4(1,1,1,1);
+        gl.uniform4fv(fColor, flatten(vec4(1,1,1,1)));
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.calcIconPoints), gl.STATIC_DRAW);
+        super.draw();
+    }
+
+    inCalcIcon(x,y) {
+        var p = this.transform(x,y);
+        return p[0] >= this.calcIconPoints[0][0] && p[0] <= this.calcIconPoints[2][0] && p[1] <= this.calcIconPoints[1][1] && p[1] >= this.calcIconPoints[0][1];
+
+    }
+
+    inBrowserIcon(x,y) {
+        var p = this.transform(x,y);
+        return p[0] >= this.browserIconPoints[0][0] && p[0] <= this.browserIconPoints[2][0] && p[1] <= this.browserIconPoints[1][1] && p[1] >= this.browserIconPoints[0][1];
+    }
+
+    setZIndex(z) {
+        for (var i = 0; i < this.points.length; i++) {
+            this.points[i][2] = z;
+            this.calcIconPoints[i][2] = z+.01;
+            this.browserIconPoints[i][2] = z+.01;
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.points), gl.STATIC_DRAW);
+    }
+}
+
 window.onload = function init() {
     canvas = document.getElementById("gl-canvas");
 
@@ -241,7 +309,7 @@ window.onload = function init() {
         oldX = x;
         oldY = y;
 
-        for (var i = 0; i < applicationWindows.length; i++) {
+        for (var i = applicationWindows.length - 1; i >= 0; i--) {
             if (applicationWindows[i].isInside(x, y)) {
                 selectedWindow = i;
                 currWindow = applicationWindows[i];
@@ -261,10 +329,35 @@ window.onload = function init() {
 
     canvas.addEventListener('click', function(event) {
         var [x,y] = convertMouseCoordinates(event.pageX, event.pageY);
-        for (var i = 0; i < applicationWindows.length; i++) {
+        if (taskBar.inCalcIcon(x,y)) {
+            var newCalc = new Calculator(100, 100, 600, 600, 1);
+            newCalc.init();
+            applicationWindows.push(newCalc);
+            for (var j = 0; j < applicationWindows.length; j++) {
+                applicationWindows[j].setZIndex(j+1);
+            }
+            taskBar.setZIndex(applicationWindows.length+1);
+            window.requestAnimFrame(render);
+            return;
+        } else if (taskBar.inBrowserIcon(x,y)){
+            var newBrowser = new WebBrowser(100, 100, 600, 600, 1);
+            newBrowser.init();
+            applicationWindows.push(newBrowser);
+            for (var j = 0; j < applicationWindows.length; j++) {
+                applicationWindows[j].setZIndex(j+1);
+            }
+            taskBar.setZIndex(applicationWindows.length+1);
+            window.requestAnimFrame(render);
+            return;
+        }
+        for (var i = applicationWindows.length - 1; i >= 0; i--) {
             if (applicationWindows[i].isInClose(x,y)) {
                 var currWindow = applicationWindows[i];
                 applicationWindows.splice(i,1);
+                for (var j = 0; j < applicationWindows.length; j++) {
+                    applicationWindows[j].setZIndex(j+1);
+                }
+                taskBar.setZIndex(applicationWindows.length+1);
                 window.requestAnimFrame(render);
                 return;
             }
@@ -299,10 +392,13 @@ window.onload = function init() {
 
     applicationWindows = [];
     applicationWindows.push(new Calculator(100, 100, 600, 600, 1));
-    applicationWindows.push(new WebBrowser(200, 200, 700, 450, 2));
+    applicationWindows.push(new WebBrowser(200, 200, 700, 700, 2));
     for (var win of applicationWindows) {
         win.init();
     }
+
+    taskBar = new Taskbar(0, canvas.height-40, canvas.width, canvas.height, applicationWindows.length+1);
+    taskBar.init();
 
     selectedWindow = -1;
 
@@ -311,8 +407,6 @@ window.onload = function init() {
     texCoord = gl.getAttribLocation(program, "texCoord");
     transformation = gl.getUniformLocation(program, "transformation");
     projection = gl.getUniformLocation(program, "projection");
-    var pm = ortho(0.0, canvas.width, canvas.height, 0.0, -10.0, 10.0);
-    gl.uniformMatrix4fv(projection, gl.TRUE, flatten(pm));
 
     var calcImg = document.getElementById('calculator-image');
     calculatorTex = configureTexture(calcImg);
@@ -322,6 +416,10 @@ window.onload = function init() {
     wallpaperTex = configureTexture(wallpaperImg);
     var closeImg = document.getElementById('close-image');
     closeTex = configureTexture(closeImg);
+    var calcIcon = document.getElementById('calc-icon');
+    calcIconTex = configureTexture(calcIcon);
+    var browserIcon = document.getElementById('web-icon');
+    browserIconTex = configureTexture(browserIcon);
 
     gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
 
@@ -332,10 +430,15 @@ window.onload = function init() {
 
 function render(){
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    console.log(applicationWindows.length)
+    var pm = ortho(0.0, canvas.width, canvas.height, 0.0, -100, 1);
+    gl.uniformMatrix4fv(projection, gl.TRUE, flatten(pm));
+
     wallpaper.draw();
     for (var i = 0; i < applicationWindows.length; i++) {
         applicationWindows[i].draw();
     }
+    taskBar.draw();
 }
 
 function convertMouseCoordinates(x, y) {
