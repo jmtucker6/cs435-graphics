@@ -8,6 +8,7 @@
 <script id="vertex-shader" type="x-shader/x-vertex">
     attribute vec4 vPosition;
     attribute vec2 texCoord;
+    
     varying vec2 fTexCoord;
 
     uniform mat4 projectionMatrix;
@@ -26,7 +27,7 @@
     uniform vec4 fColor;
 
     void main() {
-        gl_FragColor = texture2D(texture, fTexCoord);
+        gl_FragColor = fColor * texture2D(texture, fTexCoord);
     }
 </script>
 <script type="text/javascript" src="../Common/webgl-utils.js"></script>
@@ -42,5 +43,6 @@
     <img id="wallpaper-image" src="wallpaperImage.jpg" hidden />
     <img id="carpet-image" src="carpetImage.jpg" hidden />
     <img id="wood-image" src="woodImage.jpg" hidden />
+    <img id="white-image" src="white.jpg" hidden />
 </body>
 </html>
