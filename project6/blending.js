@@ -14,12 +14,16 @@ var floor;
 var table;
 var cup;
 var ball;
+var ballCenter = vec3(0, 3.8, 0);
 var texCoords = [
     vec2(0,1),
     vec2(0,0),
     vec2(1,0),
     vec2(1,1)
 ];
+
+var viewingLocations = [];
+var currViewingLocation = 2;
 
 class Quad {
     constructor(p1, p2, p3, p4, color, tex) {
@@ -256,13 +260,11 @@ class Ball {
     }
 
     divideTriangles(triangles, divisions) {
-        console.log('divisions', divisions);
         if (divisions === 0) {
             this.triangles = [];
             for (var triangle of triangles) {
                 for (var i = 0; i < triangle.length; i++) {
                     triangle[i] = add(this.center, scale(this.radius, triangle[i]));
-                    console.log(triangle[i]);
                 }
                 this.triangles.push(new Triangle(triangle[0], triangle[1], triangle[2], this.color, this.tex));
             }
@@ -312,7 +314,12 @@ window.onload = function init() {
     gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
     vPosition = gl.getAttribLocation(program, "vPosition");
     modelViewMatrix = gl.getUniformLocation(program, "modelViewMatrix");
-    var mvm = lookAt(vec3(0,1,2), vec3(0,0,0), vec3(0,1,0));
+
+    for (var i = 0; i < 5; i++) {
+        viewingLocations.push(vec3(-1*Math.cos(2*i*Math.PI/8), 4.5, Math.sin(2*i*Math.PI/8)));
+    }
+
+    var mvm = lookAt(viewingLocations[currViewingLocation], ballCenter, vec3(0,1,0));
     gl.uniformMatrix4fv(modelViewMatrix, gl.TRUE, flatten(mvm));
     projectionMatrix = gl.getUniformLocation(program, "projectionMatrix");
     var pm = ortho(-10, 10, -10, 10, -10, 10);
@@ -337,22 +344,24 @@ window.onload = function init() {
             configureTexture(carpetImg));
     table = new Table(4, 3, vec4(1,1,1,1), configureTexture(woodImg));
     cup = new Cup(vec3(0,3.01,0), 1, 2, vec4(0.5, 0.5, 0.5, 0.5), configureTexture(whiteImg));
-    ball = new Ball(vec3(0,3.8,0), 0.8, vec4(0,0,1,1), configureTexture(whiteImg));
+    ball = new Ball(ballCenter, 0.8, vec4(0,0,1,1), configureTexture(whiteImg));
     render();
 }
 
 function render() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
+    // gl.depthMask(gl.TRUE);
     wall.draw();
     floor.draw();
     table.draw();
     ball.draw();
-    gl.depthMask(gl.FALSE);
+
+    gl.depthMask(false);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
     cup.draw();
+    gl.depthMask(true);
 }
 
 function configureTexture( image ) {
@@ -366,4 +375,22 @@ function configureTexture( image ) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     return texture;
+}
+
+function rotateClockwise() {
+    if (currViewingLocation > 0) {
+        currViewingLocation--;
+    }
+    var mvm = lookAt(viewingLocations[currViewingLocation], ballCenter, vec3(0,1,0));
+    gl.uniformMatrix4fv(modelViewMatrix, gl.TRUE, flatten(mvm));
+    render();
+}
+
+function rotateCounterClockwise() {
+    if (currViewingLocation < 4) {
+        currViewingLocation++;
+    }
+    var mvm = lookAt(viewingLocations[currViewingLocation], ballCenter, vec3(0,1,0));
+    gl.uniformMatrix4fv(modelViewMatrix, gl.TRUE, flatten(mvm));
+    render();
 }
