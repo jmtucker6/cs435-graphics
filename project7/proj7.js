@@ -2,8 +2,12 @@
  * CS 435
  * Project #7
  * Jacob Tucker
- * Fog in a forest
+ * Fog in a plastic forest
  */
+var speed;
+var numTrees;
+var fogDensity;
+var fogDensityLoc;
 var fogColor = vec4(.6, .6, .6, 1.0);
 var barkColor = vec4(98/255, 78/255, 44/255);
 var lightPosition = vec4(1, 3, 3, 1);
@@ -25,7 +29,7 @@ var texCoords = [
 ];
 var mvm;
 var farthestZ;
-var tree;
+var trees = [];
 
 class Quad {
     constructor(p1, p2, p3, p4, color, tex) {
@@ -340,7 +344,11 @@ window.onload = function init() {
     var program = initShaders(gl, "vertex-shader", "fragment-shader");
     gl.useProgram(program);
 
+    fogDensity = 0.2;
+    speed = 0.3;
+    numTrees = 6;
     farthestZ = -40;
+    fogDensityLoc = gl.getUniformLocation(program, "fogDensity");
     texCoordLoc = gl.getAttribLocation(program, "texCoord");
     fColor = gl.getUniformLocation(program, "fColor");
     gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
@@ -364,10 +372,11 @@ window.onload = function init() {
     gl.uniform4fv(gl.getUniformLocation(program, "ambientLight"), flatten(ambientLight));
     gl.uniform4fv(gl.getUniformLocation(program, "diffuseLight"), flatten(diffuseLight));
     gl.uniform3fv(gl.getUniformLocation(program, "eye"), flatten(eye));
+    gl.uniform1f(fogDensityLoc, fogDensity);
 
     whiteImg = document.getElementById('white-image');
 
-    tree = new Tree(Math.random()*20-10, vec4(0,0,1,1), configureTexture(whiteImg));
+    trees.push(createNewTree());
     
     render();
 }
@@ -375,12 +384,18 @@ window.onload = function init() {
 function render() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
-    tree.updateZOffset(0.1);
-    if (tree.zOffset >= Math.abs(farthestZ)) {
-        console.log('done');
-        tree = createNewTree();
-    }
-    tree.draw();
+    trees.forEach((tree, i) => {
+        trees[i].updateZOffset(speed);
+        if (trees[i].zOffset >= Math.abs(farthestZ)/numTrees && trees[i].zOffset < Math.abs(farthestZ)/numTrees+speed) {
+            trees.push(createNewTree());
+        } else if (tree.zOffset >= Math.abs(farthestZ)) {
+            trees.shift();
+            console.log(trees.length);
+        }
+    });
+    trees.forEach((tree) => {
+        tree.draw();
+    });
     requestAnimFrame(render);
 }
 
@@ -389,7 +404,6 @@ function configureTexture( image ) {
     gl.bindTexture( gl.TEXTURE_2D, texture );
     gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, 
          gl.RGB, gl.UNSIGNED_BYTE, image );
-    // gl.generateMipmap( gl.TEXTURE_2D );
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -419,4 +433,22 @@ function selectColor() {
         case 6:
             return vec4(0,1,1,1);
     }
+}
+
+function decreaseSpeed() {
+    speed = Math.max(speed-0.1, 0.1);
+}
+
+function increaseSpeed() {
+    speed = Math.min(speed+0.1, 1);
+}
+function increaseFog() {
+    fogDensity = Math.min(fogDensity + 0.05, 0.6);
+    gl.uniform1f(fogDensityLoc, fogDensity);
+    console.log('fogDensity', fogDensity);
+}
+function decreaseFog() {
+    fogDensity = Math.max(fogDensity - 0.05, 0.05);
+    gl.uniform1f(fogDensityLoc, fogDensity);
+    console.log('fogDensity', fogDensity);
 }
