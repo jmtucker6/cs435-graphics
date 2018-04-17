@@ -20,32 +20,20 @@ var projectionMatrix;
 var vPosition;
 var normal;
 var fColor;
-var texCoordLoc;
-var texCoords = [
-    vec2(0,1),
-    vec2(0,0),
-    vec2(1,0),
-    vec2(1,1)
-];
 var mvm;
 var farthestZ;
 var trees = [];
 
 class Quad {
-    constructor(p1, p2, p3, p4, color, tex) {
+    constructor(p1, p2, p3, p4, color) {
         this.points = [p1, p2, p3, p4];
         const norm = this.getNorm();
         this.norms = [norm, norm, norm, norm];
-        this.tex = tex;
         this.color = color;
 
         this.vBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(this.points), gl.STATIC_DRAW);
-
-        this.tBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
 
         this.nBuffer = gl.createBuffer();
         this.setNormBuffer();
@@ -57,15 +45,10 @@ class Quad {
     }
 
     draw() {
-        gl.bindTexture(gl.TEXTURE_2D, this.tex);
         gl.uniform4fv(fColor, flatten(this.color));
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
         gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(vPosition);
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
-        gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(texCoordLoc);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
         gl.vertexAttribPointer(normal, 3, gl.FLOAT, false, 0, 0);
@@ -82,21 +65,18 @@ class Quad {
 }
 
 class Circle {
-    constructor(center, radius, color, tex) {
+    constructor(center, radius, color) {
         this.center = center;
         this.radius = radius;
-        this.tex = tex;
         this.color = color;
         this.points = [];
         this.norms = [];
-        this.texCoords = [vec2(0,0)];
         this.points.push(center);
         this.sides = 36;
 
         for (var i = 0; i <= this.sides; i++) {
             var point = vec3(radius*Math.sin(2*i*Math.PI/this.sides), 0, radius*Math.cos(2*i*Math.PI/this.sides));
             this.points.push(add(point, center));
-            this.texCoords.push(vec2(0,0));
         }
 
         const norm = this.getNorm();
@@ -109,24 +89,16 @@ class Circle {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(this.points), gl.STATIC_DRAW);
 
-        this.tBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.texCoords), gl.STATIC_DRAW);
-
         this.nBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(this.norms), gl.STATIC_DRAW);
     }
 
     draw() {
-        gl.bindTexture(gl.TEXTURE_2D, this.tex);
         gl.uniform4fv(fColor, flatten(this.color));
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
         gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(vPosition);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
-        gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(texCoordLoc);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
         gl.vertexAttribPointer(normal, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(normal);
@@ -142,21 +114,15 @@ class Circle {
 }
 
 class Triangle {
-    constructor(p1, p2, p3, color, tex) {
+    constructor(p1, p2, p3, color) {
         this.points = [p1,p2,p3];
         const norm = this.getNorm();
         this.norms = [norm, norm, norm];
         this.color = color;
-        this.tex = tex;
-        this.texCoords = [vec2(0,0),vec2(0,0),vec2(0,0)];
 
         this.vBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(this.points), gl.STATIC_DRAW);
-
-        this.tBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.texCoords), gl.STATIC_DRAW);
 
         this.nBuffer = gl.createBuffer();
         this.setNormBuffer();
@@ -168,14 +134,10 @@ class Triangle {
     }
 
     draw() {
-        gl.bindTexture(gl.TEXTURE_2D, this.tex);
         gl.uniform4fv(fColor, flatten(this.color));
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
         gl.vertexAttribPointer(vPosition, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(vPosition);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
-        gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(texCoordLoc);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
         gl.vertexAttribPointer(normal, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(normal);
@@ -192,21 +154,20 @@ class Triangle {
 
 
 class Cylinder {
-    constructor(center, radius, height, color, tex) {
+    constructor(center, radius, height, color) {
         this.center = center;
         this.radius = radius;
         this.height = height;
         this.color = color;
-        this.tex = tex;
-        this.bottom = new Circle(center, radius, color, tex);
-        this.top = new Circle(add(vec3(0,height,0), center), radius, color, tex);
+        this.bottom = new Circle(center, radius, color);
+        this.top = new Circle(add(vec3(0,height,0), center), radius, color);
         this.walls = [];
         for (var i = 1; i < this.bottom.points.length-1; i++) {
             var p1 = add(vec3(0,height,0),this.bottom.points[i]);
             var p2 = this.bottom.points[i];
             var p3 = this.bottom.points[i+1];
             var p4 = add(vec3(0,height,0),this.bottom.points[i+1]);
-            this.walls.push(new Quad(p1,p2,p3,p4,color,tex));
+            this.walls.push(new Quad(p1,p2,p3,p4,color));
         }
         this.fixNormals();
     }
@@ -232,11 +193,10 @@ class Cylinder {
 }
 
 class Ball {
-    constructor(center, radius, color, tex) {
+    constructor(center, radius, color) {
         this.center = center;
         this.radius = radius;
         this.color = color;
-        this.tex = tex;
         this.numDivisions = 3;
         var startPoints = [vec3(0,1,0)];
         for (var i = 0; i < 4; i++) {
@@ -263,7 +223,7 @@ class Ball {
                 for (var i = 0; i < triangle.length; i++) {
                     triangle[i] = add(this.center, scale(this.radius, triangle[i]));
                 }
-                this.triangles.push(new Triangle(triangle[0], triangle[1], triangle[2], this.color, this.tex));
+                this.triangles.push(new Triangle(triangle[0], triangle[1], triangle[2], this.color));
             }
             return;
         }
@@ -308,14 +268,13 @@ class Ball {
 }
 
 class Tree {
-    constructor(xcoord, color, tex) {
+    constructor(xcoord, color) {
         this.xcoord = xcoord;
         this.trunkColor = color;
         this.topColor = vec3(Math.random(), Math.random(), Math.random(), 1);
-        this.tex = tex;
         this.zOffset = 0;
-        this.trunk = new Cylinder(vec3(this.xcoord, -1, farthestZ), 0.5, 6, barkColor, tex);
-        this.top = new Ball(vec3(this.xcoord, 5-1, farthestZ), 2, color, tex);
+        this.trunk = new Cylinder(vec3(this.xcoord, -1, farthestZ), 0.5, 6, barkColor);
+        this.top = new Ball(vec3(this.xcoord, 5-1, farthestZ), 2, color);
     }
 
     updateZOffset(offset) {
@@ -339,7 +298,6 @@ window.onload = function init() {
     gl = WebGLUtils.setupWebGL(canvas);
     if (!gl) { alert("WebGL isn't available"); }
     gl.viewport(0,0,canvas.width, canvas.height);
-    console.log(fogColor);
     gl.clearColor(fogColor[0],fogColor[1],fogColor[2],1);
     var program = initShaders(gl, "vertex-shader", "fragment-shader");
     gl.useProgram(program);
@@ -349,21 +307,17 @@ window.onload = function init() {
     numTrees = 6;
     farthestZ = -40;
     fogDensityLoc = gl.getUniformLocation(program, "fogDensity");
-    texCoordLoc = gl.getAttribLocation(program, "texCoord");
     fColor = gl.getUniformLocation(program, "fColor");
-    gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
     normal = gl.getAttribLocation(program, "normal");
     vPosition = gl.getAttribLocation(program, "vPosition");
     modelViewMatrix = gl.getUniformLocation(program, "modelViewMatrix");
     var fogColorLoc = gl.getUniformLocation(program, "fogColor");
 
     mvm = lookAt(eye, vec3(0,0,0), vec3(0,1,0));
-    console.log("mvm", mvm);
     gl.uniformMatrix4fv(modelViewMatrix, gl.TRUE, flatten(mvm));
     projectionMatrix = gl.getUniformLocation(program, "projectionMatrix");
     // var pm = ortho(-10, 10, -10, 10, -10, 10);
     var pm = perspective(90.0, canvas.width/canvas.height, 2, -10);
-    console.log("pm", pm);
     gl.uniformMatrix4fv(projectionMatrix, gl.TRUE, flatten(pm));
 
    
@@ -390,7 +344,6 @@ function render() {
             trees.push(createNewTree());
         } else if (tree.zOffset >= Math.abs(farthestZ)) {
             trees.shift();
-            console.log(trees.length);
         }
     });
     trees.forEach((tree) => {
@@ -399,20 +352,9 @@ function render() {
     requestAnimFrame(render);
 }
 
-function configureTexture( image ) {
-    var texture = gl.createTexture();
-    gl.bindTexture( gl.TEXTURE_2D, texture );
-    gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, 
-         gl.RGB, gl.UNSIGNED_BYTE, image );
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    return texture;
-}
 
 function createNewTree() {
-    return new Tree(Math.random()*20-10, selectColor(), configureTexture(whiteImg));
+    return new Tree(Math.random()*20-10, selectColor());
 }
 
 function selectColor() {
@@ -445,10 +387,8 @@ function increaseSpeed() {
 function increaseFog() {
     fogDensity = Math.min(fogDensity + 0.05, 0.6);
     gl.uniform1f(fogDensityLoc, fogDensity);
-    console.log('fogDensity', fogDensity);
 }
 function decreaseFog() {
     fogDensity = Math.max(fogDensity - 0.05, 0.05);
     gl.uniform1f(fogDensityLoc, fogDensity);
-    console.log('fogDensity', fogDensity);
 }

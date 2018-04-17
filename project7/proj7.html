@@ -7,10 +7,8 @@
 
 <script id="vertex-shader" type="x-shader/x-vertex">
     attribute vec4 vPosition;
-    attribute vec2 texCoord;
     attribute vec4 normal;
     
-    varying vec2 fTexCoord;
     varying float fDist;
     varying vec4 fPosition;
     varying vec4 fNormal;
@@ -21,17 +19,14 @@
     void main() {
         gl_Position = projectionMatrix*modelViewMatrix*vPosition;
         fDist = abs(gl_Position.z);
-        fTexCoord = texCoord;
         fNormal = normal;
     }
 </script>
 
 <script id="fragment-shader" type="x-shader/x-fragment">
     precision mediump float;
-    uniform sampler2D texture;
     uniform vec4 fogColor;
     varying vec4 fNormal;
-    varying vec2 fTexCoord;
     varying float fDist;
     varying vec4 fPosition;
     uniform vec4 fColor;
@@ -57,7 +52,7 @@
         
         // Fog
         float fogFactor = clamp(exp(-1.0 * (fDist * fogDensity) * (fDist * fogDensity)), 0.0, 1.0);
-        gl_FragColor = mix(fogColor, tempColor, fogFactor) * texture2D(texture, fTexCoord);
+        gl_FragColor = mix(fogColor, tempColor, fogFactor);
     }
 </script>
 <script type="text/javascript" src="../Common/webgl-utils.js"></script>
