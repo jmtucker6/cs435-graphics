@@ -44,6 +44,10 @@ class Quad {
         gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
 
         this.nBuffer = gl.createBuffer();
+        this.setNormBuffer();
+    }
+
+    setNormBuffer() {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(this.norms), gl.STATIC_DRAW);
     }
@@ -200,6 +204,7 @@ class Cylinder {
             var p4 = add(vec3(0,height,0),this.bottom.points[i+1]);
             this.walls.push(new Quad(p1,p2,p3,p4,color,tex));
         }
+        this.fixNormals();
     }
 
     draw() {
@@ -208,6 +213,17 @@ class Cylinder {
             wall.draw();
         }
         this.top.draw();
+    }
+
+    fixNormals() {
+        for (var i = 0; i < this.walls.length; i++) {
+            for (var j = 0; j < this.walls[i].points.length; j++) {
+                var norm = subtract(this.walls[i].points[j], this.center);
+                norm[1] = 0;
+                this.walls[i].norms[j] = normalize(norm);
+            }
+            this.walls[i].setNormBuffer();
+        }
     }
 }
 
