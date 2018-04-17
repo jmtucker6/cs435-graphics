@@ -4,7 +4,8 @@
  * Jacob Tucker
  * Fog in a forest
  */
-var fogColor = vec3(1.0, 1.0, 1.0, 1.0);
+var fogColor = vec4(.3, .3, .3, 1.0);
+var whiteImg;
 var modelViewMatrix;
 var projectionMatrix;
 var vPosition;
@@ -16,6 +17,9 @@ var texCoords = [
     vec2(1,0),
     vec2(1,1)
 ];
+var mvm;
+var farthestZ;
+var tree;
 
 class Quad {
     constructor(p1, p2, p3, p4, color, tex) {
@@ -127,7 +131,7 @@ class Cylinder {
         this.color = color;
         this.tex = tex;
         this.bottom = new Circle(center, radius, color, tex);
-        this.bottom = new Circle(add(vec3(0,height,0), center), radius, color, tex);
+        this.top = new Circle(add(vec3(0,height,0), center), radius, color, tex);
         this.walls = [];
         for (var i = 1; i < this.bottom.points.length-1; i++) {
             var p1 = add(vec3(0,height,0),this.bottom.points[i]);
@@ -212,28 +216,66 @@ class Ball {
     }
 }
 
+class Tree {
+    constructor(xcoord, color, tex) {
+        this.xcoord = xcoord;
+        this.trunkColor = color;
+        this.topColor = vec3(Math.random(), Math.random(), Math.random(), 1);
+        this.tex = tex;
+        this.zOffset = 0;
+        this.trunk = new Cylinder(vec3(this.xcoord, -1, farthestZ), 0.5, 6, color, tex);
+        this.top = new Ball(vec3(this.xcoord, 5-1, farthestZ), 2, color, tex);
+    }
+
+    updateZOffset(offset) {
+        this.zOffset += offset;
+    }
+
+    setZOffset(offset) {
+        this.zOffset = offset;
+    }
+    draw() {
+        var newMvm = mult(mvm, translate(0,0,this.zOffset));
+        gl.uniformMatrix4fv(modelViewMatrix, gl.TRUE, flatten(newMvm));
+        this.top.draw();
+        this.trunk.draw();
+        gl.uniformMatrix4fv(modelViewMatrix, gl.TRUE, flatten(mvm));
+    }
+}
+
 window.onload = function init() {
     canvas = document.getElementById("gl-canvas");
     gl = WebGLUtils.setupWebGL(canvas);
     if (!gl) { alert("WebGL isn't available"); }
     gl.viewport(0,0,canvas.width, canvas.height);
-    gl.clearColor(fogColor);
+    console.log(fogColor);
+    gl.clearColor(fogColor[0],fogColor[1],fogColor[2],1);
     var program = initShaders(gl, "vertex-shader", "fragment-shader");
     gl.useProgram(program);
 
+    farthestZ = -40;
     texCoordLoc = gl.getAttribLocation(program, "texCoord");
     fColor = gl.getUniformLocation(program, "fColor");
     gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
     vPosition = gl.getAttribLocation(program, "vPosition");
     modelViewMatrix = gl.getUniformLocation(program, "modelViewMatrix");
+    var fogColorLoc = gl.getUniformLocation(program, "fogColor");
 
-    var mvm = lookAt(vec3(0,1,2), vec3(0,0,0), vec3(0,1,0));
+    mvm = lookAt(vec3(0,0,1), vec3(0,0,0), vec3(0,1,0));
+    console.log("mvm", mvm);
     gl.uniformMatrix4fv(modelViewMatrix, gl.TRUE, flatten(mvm));
     projectionMatrix = gl.getUniformLocation(program, "projectionMatrix");
-    var pm = perspective(45.0, canvas.width/canvas.height, 0, 20)
+    // var pm = ortho(-10, 10, -10, 10, -10, 10);
+    var pm = perspective(90.0, canvas.width/canvas.height, 2, -10);
+    console.log("pm", pm);
     gl.uniformMatrix4fv(projectionMatrix, gl.TRUE, flatten(pm));
 
-    var whiteImg = document.getElementById('white-image');
+   
+    gl.uniform4fv(fogColorLoc, flatten(fogColor));
+
+    whiteImg = document.getElementById('white-image');
+
+    tree = new Tree(Math.random()*20-10, vec4(0,0,1,1), configureTexture(whiteImg));
     
     render();
 }
@@ -241,6 +283,13 @@ window.onload = function init() {
 function render() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
+    tree.updateZOffset(0.1);
+    if (tree.zOffset >= Math.abs(farthestZ)) {
+        console.log('done');
+        tree = createNewTree();
+    }
+    tree.draw();
+    requestAnimFrame(render);
 }
 
 function configureTexture( image ) {
@@ -256,20 +305,28 @@ function configureTexture( image ) {
     return texture;
 }
 
-function rotateClockwise() {
-    if (currViewingLocation > 0) {
-        currViewingLocation--;
-    }
-    var mvm = lookAt(viewingLocations[currViewingLocation], ballCenter, vec3(0,1,0));
-    gl.uniformMatrix4fv(modelViewMatrix, gl.TRUE, flatten(mvm));
-    render();
+function createNewTree() {
+    return new Tree(Math.random()*20-10, selectColor(), configureTexture(whiteImg));
 }
 
-function rotateCounterClockwise() {
-    if (currViewingLocation < 4) {
-        currViewingLocation++;
+function selectColor() {
+    const i = Math.floor(Math.random()*8);
+    switch (i) {
+        case 0:
+            return vec4(1,1,1,1);
+        case 1:
+            return vec4(1,0,0,1);
+        case 2:
+            return vec4(0,1,0,1);
+        case 3:
+            return vec4(0,0,1,1);
+        case 4:
+            return vec4(1,1,0,1);
+        case 5:
+            return vec4(1,0,1,1);
+        case 6:
+            return vec4(0,1,1,1);
+        case 7:
+            return vec4(0,0,0,1);
     }
-    var mvm = lookAt(viewingLocations[currViewingLocation], ballCenter, vec3(0,1,0));
-    gl.uniformMatrix4fv(modelViewMatrix, gl.TRUE, flatten(mvm));
-    render();
 }

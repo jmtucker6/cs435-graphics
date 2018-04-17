@@ -10,12 +10,14 @@
     attribute vec2 texCoord;
     
     varying vec2 fTexCoord;
+    varying float fDist;
 
     uniform mat4 projectionMatrix;
     uniform mat4 modelViewMatrix;
 
     void main() {
         gl_Position = projectionMatrix*modelViewMatrix*vPosition;
+        fDist = abs(gl_Position.z);
         fTexCoord = texCoord;
     }
 </script>
@@ -23,21 +25,27 @@
 <script id="fragment-shader" type="x-shader/x-fragment">
     precision mediump float;
     uniform sampler2D texture;
+    uniform vec4 fogColor;
     varying vec2 fTexCoord;
+    varying float fDist;
     uniform vec4 fColor;
 
     void main() {
-        gl_FragColor = fColor * texture2D(texture, fTexCoord);
+        float density = 0.175;
+        float fogFactor = clamp(exp(-1.0 * (fDist * density) * (fDist * density)), 0.0, 1.0);
+        //float fogFactor = clamp(fDist/endpoint, 0.0, 1.0);
+        gl_FragColor = mix(fogColor, fColor, fogFactor) * texture2D(texture, fTexCoord);
+        // gl_FragColor = fColor;
     }
 </script>
 <script type="text/javascript" src="../Common/webgl-utils.js"></script>
 <script type="text/javascript" src="../Common/initShaders.js"></script>
 <script type="text/javascript" src="../Common/MV.js"></script>
-<script type="text/javascript" src="blending.js"></script>
+<script type="text/javascript" src="proj7.js"></script>
 </head>
 
 <body>
-    <canvas id = "gl-canvas" width="1024" height="1024">
+    <canvas id = "gl-canvas" width="1024" height="812">
         Your browser does not support HTML5 canvas
     </canvas>
     <img id="white-image" src="white.jpg" hidden />
