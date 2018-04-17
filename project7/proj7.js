@@ -4,11 +4,17 @@
  * Jacob Tucker
  * Fog in a forest
  */
-var fogColor = vec4(.3, .3, .3, 1.0);
+var fogColor = vec4(.6, .6, .6, 1.0);
+var barkColor = vec4(98/255, 78/255, 44/255);
+var lightPosition = vec4(1, 3, 3, 1);
+var ambientLight = vec4(0.0, 0.0, 0.0, 1);
+var diffuseLight = vec4(1,1,1,1);
+var eye = vec3(0,0,1);
 var whiteImg;
 var modelViewMatrix;
 var projectionMatrix;
 var vPosition;
+var normal;
 var fColor;
 var texCoordLoc;
 var texCoords = [
@@ -24,6 +30,8 @@ var tree;
 class Quad {
     constructor(p1, p2, p3, p4, color, tex) {
         this.points = [p1, p2, p3, p4];
+        const norm = this.getNorm();
+        this.norms = [norm, norm, norm, norm];
         this.tex = tex;
         this.color = color;
 
@@ -34,6 +42,10 @@ class Quad {
         this.tBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
+
+        this.nBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.norms), gl.STATIC_DRAW);
     }
 
     draw() {
@@ -47,7 +59,17 @@ class Quad {
         gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(texCoordLoc);
 
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
+        gl.vertexAttribPointer(normal, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(normal);
+
         gl.drawArrays(gl.TRIANGLE_FAN, 0, this.points.length);
+    }
+
+    getNorm() {
+        const v1 = subtract(this.points[1], this.points[0]);
+        const v2 = subtract(this.points[3], this.points[0]);
+        return cross(v1, v2);
     }
 }
 
@@ -58,6 +80,7 @@ class Circle {
         this.tex = tex;
         this.color = color;
         this.points = [];
+        this.norms = [];
         this.texCoords = [vec2(0,0)];
         this.points.push(center);
         this.sides = 36;
@@ -68,6 +91,11 @@ class Circle {
             this.texCoords.push(vec2(0,0));
         }
 
+        const norm = this.getNorm();
+        for (var i = 0; i < this.points.length; ++i) {
+            this.norms[i] = norm;
+        }
+
 
         this.vBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vBuffer);
@@ -76,6 +104,10 @@ class Circle {
         this.tBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(this.texCoords), gl.STATIC_DRAW);
+
+        this.nBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.norms), gl.STATIC_DRAW);
     }
 
     draw() {
@@ -87,14 +119,25 @@ class Circle {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
         gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(texCoordLoc);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
+        gl.vertexAttribPointer(normal, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(normal);
 
         gl.drawArrays(gl.TRIANGLE_FAN, 0, this.points.length);
+    }
+
+    getNorm() {
+        const v1 = subtract(this.points[1], this.points[0]);
+        const v2 = subtract(this.points[2], this.points[0]);
+        return cross(v1, v2);
     }
 }
 
 class Triangle {
     constructor(p1, p2, p3, color, tex) {
         this.points = [p1,p2,p3];
+        const norm = this.getNorm();
+        this.norms = [norm, norm, norm];
         this.color = color;
         this.tex = tex;
         this.texCoords = [vec2(0,0),vec2(0,0),vec2(0,0)];
@@ -106,6 +149,14 @@ class Triangle {
         this.tBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, flatten(this.texCoords), gl.STATIC_DRAW);
+
+        this.nBuffer = gl.createBuffer();
+        this.setNormBuffer();
+    }
+
+    setNormBuffer() {
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(this.norms), gl.STATIC_DRAW);
     }
 
     draw() {
@@ -117,8 +168,17 @@ class Triangle {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.tBuffer);
         gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(texCoordLoc);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.nBuffer);
+        gl.vertexAttribPointer(normal, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(normal);
 
         gl.drawArrays(gl.TRIANGLES, 0, this.points.length);
+    }
+
+    getNorm() {
+        const v1 = subtract(this.points[1], this.points[0]);
+        const v2 = subtract(this.points[2], this.points[0]);
+        return cross(v1, v2);
     }
 }
 
@@ -173,6 +233,7 @@ class Ball {
                 [startPoints[5], startPoints[1], startPoints[4]]
                 ];
         this.divideTriangles(startTriangles, this.numDivisions);
+        this.fixNormals();
     }
 
     divideTriangles(triangles, divisions) {
@@ -209,6 +270,16 @@ class Ball {
         ];
     }
 
+    fixNormals() {
+
+        for (var i = 0; i < this.triangles.length; i++) {
+            for (var j = 0; j < this.triangles[i].points.length; j++) {
+                this.triangles[i].norms[j] = normalize(subtract(this.triangles[i].points[j], this.center));
+            }
+            this.triangles[i].setNormBuffer();
+        }
+    }
+
     draw() {
         for (var triangle of this.triangles) {
             triangle.draw();
@@ -223,7 +294,7 @@ class Tree {
         this.topColor = vec3(Math.random(), Math.random(), Math.random(), 1);
         this.tex = tex;
         this.zOffset = 0;
-        this.trunk = new Cylinder(vec3(this.xcoord, -1, farthestZ), 0.5, 6, color, tex);
+        this.trunk = new Cylinder(vec3(this.xcoord, -1, farthestZ), 0.5, 6, barkColor, tex);
         this.top = new Ball(vec3(this.xcoord, 5-1, farthestZ), 2, color, tex);
     }
 
@@ -257,11 +328,12 @@ window.onload = function init() {
     texCoordLoc = gl.getAttribLocation(program, "texCoord");
     fColor = gl.getUniformLocation(program, "fColor");
     gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
+    normal = gl.getAttribLocation(program, "normal");
     vPosition = gl.getAttribLocation(program, "vPosition");
     modelViewMatrix = gl.getUniformLocation(program, "modelViewMatrix");
     var fogColorLoc = gl.getUniformLocation(program, "fogColor");
 
-    mvm = lookAt(vec3(0,0,1), vec3(0,0,0), vec3(0,1,0));
+    mvm = lookAt(eye, vec3(0,0,0), vec3(0,1,0));
     console.log("mvm", mvm);
     gl.uniformMatrix4fv(modelViewMatrix, gl.TRUE, flatten(mvm));
     projectionMatrix = gl.getUniformLocation(program, "projectionMatrix");
@@ -272,6 +344,10 @@ window.onload = function init() {
 
    
     gl.uniform4fv(fogColorLoc, flatten(fogColor));
+    gl.uniform4fv(gl.getUniformLocation(program, "lightPosition"), flatten(lightPosition));
+    gl.uniform4fv(gl.getUniformLocation(program, "ambientLight"), flatten(ambientLight));
+    gl.uniform4fv(gl.getUniformLocation(program, "diffuseLight"), flatten(diffuseLight));
+    gl.uniform3fv(gl.getUniformLocation(program, "eye"), flatten(eye));
 
     whiteImg = document.getElementById('white-image');
 
@@ -297,7 +373,7 @@ function configureTexture( image ) {
     gl.bindTexture( gl.TEXTURE_2D, texture );
     gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, 
          gl.RGB, gl.UNSIGNED_BYTE, image );
-    gl.generateMipmap( gl.TEXTURE_2D );
+    // gl.generateMipmap( gl.TEXTURE_2D );
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -310,7 +386,7 @@ function createNewTree() {
 }
 
 function selectColor() {
-    const i = Math.floor(Math.random()*8);
+    const i = Math.floor(Math.random()*7);
     switch (i) {
         case 0:
             return vec4(1,1,1,1);
@@ -326,7 +402,5 @@ function selectColor() {
             return vec4(1,0,1,1);
         case 6:
             return vec4(0,1,1,1);
-        case 7:
-            return vec4(0,0,0,1);
     }
 }
